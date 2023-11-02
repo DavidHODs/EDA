@@ -5,3 +5,10 @@
 {"level":"info","listener":"listener three","time":"2022-1111-02T02:117:11+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:186","message":"listener 3 modified OLLEH received from listener 2 into olleh"}
 {"level":"info","response":"struct of data received + modifications","time":"2022-1111-02T02:117:17+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:248","message":"{hello HELLO olleh 2023-11-02 02:17:04.267343237 +0100 WAT m=+2.286049471}"}
 {"level":"info","time":"2022-1111-02T02:117:17+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:212","message":"all processes done, now gracefully exiting"}
+{"level":"info","listener":"listener one","time":"2022-1111-02T02:28:02+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:132","message":"listener 1 received hello"}
+{"level":"info","listener":"listener two","time":"2022-1111-02T02:28:02+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:160","message":"listener 2 received HELLO from listener 1"}
+{"level":"info","listener":"listener three","time":"2022-1111-02T02:28:02+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:187","message":"listener 3 received OLLEH from listener 2"}
+{"level":"info","listener":"listener three","time":"2022-1111-02T02:28:02+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:195","message":"listener 3 modified OLLEH received from listener 2 into olleh"}
+{"level":"info","response":"struct of data received + modifications","time":"2022-1111-02T02:28:05+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:257","message":"{hello HELLO olleh 2023-11-02 02:28:05.292342101 +0100 WAT m=+2.428448059}"}
+{"level":"info","time":"2022-1111-02T02:28:05+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:221","message":"all processes done, now gracefully exiting"}
+{"level":"fatal","ctx":"ctx done","time":"2022-1111-02T02:28:08+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:217","message":"operation cancelled: operation took too long"}

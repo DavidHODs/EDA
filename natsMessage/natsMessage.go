@@ -1,6 +1,7 @@
 package natsMessage
 
 import (
+	"fmt"
 	"log"
 	"runtime"
 	"strings"
@@ -34,11 +35,13 @@ type EventResponse struct {
 }
 
 // forwardMessage publishes a payload modified by the respective listener
-func forwardMessage(nc *nats.Conn, subject, forwardingListener string, data []byte) {
+func forwardMessage(nc *nats.Conn, subject, forwardingListener string, data []byte) error {
 	err := nc.Publish(subject, data)
 	if err != nil {
-		log.Printf("%s: error publishing message: %v", forwardingListener, err)
+		return fmt.Errorf("%s: error publishing message: %v", forwardingListener, err)
 	}
+
+	return nil
 }
 
 // NatsOpsDemo connects with NATS server, subscribes, and publishes modified payload - over HTTP Request
@@ -51,7 +54,6 @@ func NatsOpsDemo(c *fiber.Ctx) error {
 
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
-		log.Printf("could not connect to NATS server: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 	defer nc.Close()
@@ -61,10 +63,8 @@ func NatsOpsDemo(c *fiber.Ctx) error {
 	// Create a subscriber to receive the message.
 	sub, err := nc.Subscribe(listenerOneSubject, func(msg *nats.Msg) {
 		listenerOneData = string(msg.Data)
-		log.Println(listenerOneData)
 	})
 	if err != nil {
-		log.Printf("error: listener1 could not subscribe: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 	defer sub.Unsubscribe()
@@ -72,7 +72,6 @@ func NatsOpsDemo(c *fiber.Ctx) error {
 	// Publish the message after subscribing.
 	err = nc.Publish(listenerOneSubject, []byte(eventReq.EventName))
 	if err != nil {
-		log.Printf("error publishing message: %s", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
 
@@ -136,7 +135,12 @@ func NatsOps() {
 		capitalizedData := []byte(strings.ToUpper(listenerOneData))
 
 		// publishes modified data for second listener to pick up
-		forwardMessage(nc, listenerTwoSubject, "listener1", capitalizedData)
+		err = forwardMessage(nc, listenerTwoSubject, "listener1", capitalizedData)
+		if err != nil {
+			logger.Error().
+				Str("publisher", "publisher two").
+				Msgf("%s", err)
+		}
 	})
 	if err != nil {
 		logger.Error().
@@ -159,7 +163,12 @@ func NatsOps() {
 		reversedData := []byte(utils.ReverseString(listenerTwoData))
 
 		// publishes modified data for third listener to pick up
-		forwardMessage(nc, listenerThreeSubject, "listener2", reversedData)
+		err = forwardMessage(nc, listenerThreeSubject, "listener2", reversedData)
+		if err != nil {
+			logger.Error().
+				Str("publisher", "publisher three").
+				Msgf("%s", err)
+		}
 	})
 	if err != nil {
 		logger.Error().
