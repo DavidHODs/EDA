@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -16,7 +15,7 @@ type EventRequest struct {
 func LoadEnv(keys ...string) ([]string, error) {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("error loading .env file")
+		return nil, err
 	}
 
 	var values []string
@@ -50,8 +49,6 @@ func Logger(logFile string) (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error: could not open log file: %s", err)
 	}
-
-	log.SetOutput(file)
 
 	return file, nil
 }

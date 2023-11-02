@@ -11,6 +11,7 @@ import (
 	"github.com/DavidHODs/EDA/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/rs/zerolog"
 	"golang.org/x/net/context"
 )
 
@@ -80,24 +81,32 @@ func NatsOpsDemo(c *fiber.Ctx) error {
 
 // NatsOps connects with nats server, subscribes and publishes modified payload
 func NatsOps() {
-	logger, err := utils.Logger(logFile)
+	logF, err := utils.Logger(logFile)
 	if err != nil {
 		log.Fatalf("error: could not create nats ops log file: %s", err)
 	}
-	defer logger.Close()
+	defer logF.Close()
 
-	log.SetOutput(logger)
+	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
+
+	// sets up a logger with the created log file as the log output destination
+	logger := zerolog.New(logF).With().Timestamp().Caller().Logger()
+
 	// retrieves nats url from env file
 	envValue, err := utils.LoadEnv("NATS_URL")
 	if err != nil {
-		log.Fatalf("error: %s", err)
+		logger.Fatal().
+			Str("error", "utility error").
+			Msg("could not load env file")
 	}
 	url := envValue[0]
 
 	// connects to nats server using the specified url
 	nc, err := nats.Connect(url)
 	if err != nil {
-		log.Fatalf("could not connect to nats server: %s", err)
+		logger.Fatal().
+			Str("nats", "connection error").
+			Msg("could not connect to nats server using the specified url")
 	}
 	defer nc.Close()
 
@@ -119,7 +128,9 @@ func NatsOps() {
 
 		listenerOneData := string(msg.Data)
 		listenerOne = &listenerOneData
-		log.Printf("listener1 received %s ", listenerOneData)
+		logger.Info().
+			Str("listener", "listener one").
+			Msgf("listener 1 received %s", listenerOneData)
 
 		// converts received data to all caps
 		capitalizedData := []byte(strings.ToUpper(listenerOneData))
@@ -128,7 +139,9 @@ func NatsOps() {
 		forwardMessage(nc, listenerTwoSubject, "listener1", capitalizedData)
 	})
 	if err != nil {
-		log.Printf("error: listener1 could not subscribe: %v", err)
+		logger.Error().
+			Str("listener1", "subscribtion error").
+			Msgf("error: listener1 could not subscribe: %v", err)
 	}
 	defer sub1.Drain()
 
@@ -138,7 +151,9 @@ func NatsOps() {
 
 		listenerTwoData := string(msg.Data)
 		listenerTwo = &listenerTwoData
-		log.Printf("listener2 received %s from listener1", listenerTwoData)
+		logger.Info().
+			Str("listener", "listener two").
+			Msgf("listener 2 received %s from listener 1", listenerTwoData)
 
 		// reverses received data
 		reversedData := []byte(utils.ReverseString(listenerTwoData))
@@ -147,7 +162,9 @@ func NatsOps() {
 		forwardMessage(nc, listenerThreeSubject, "listener2", reversedData)
 	})
 	if err != nil {
-		log.Printf("error: listener2 could not subscribe: %v", err)
+		logger.Error().
+			Str("listener2", "subscribtion error").
+			Msgf("error: listener2 could not subscribe: %v", err)
 	}
 	defer sub2.Drain()
 
@@ -156,13 +173,17 @@ func NatsOps() {
 		defer wg.Done()
 
 		listenerThreeData := string(msg.Data)
-		log.Printf("listener3 received %s from listener2", listenerThreeData)
+		logger.Info().
+			Str("listener", "listener three").
+			Msgf("listener 3 received %s from listener 2", listenerThreeData)
 
 		// converts received data to lower form
 		lowerDataStr := strings.ToLower(listenerThreeData)
 		lowerData := []byte(strings.ToLower(listenerThreeData))
 
-		log.Printf("listener3 modified %s from listener2 into %s", listenerThreeData, lowerData)
+		logger.Info().
+			Str("listener", "listener three").
+			Msgf("listener 3 modified %s received from listener 2 into %s", listenerThreeData, lowerData)
 		listenerThree = &lowerDataStr
 
 		// *** the following lines are commented out - it triggers a negative waitgroup error plus it creates an infinite loop of multiple subscribers and publishers actions ***
@@ -171,7 +192,9 @@ func NatsOps() {
 		// forwardMessage(nc, listenerTwoSubject, "listener3", lowerData)
 	})
 	if err != nil {
-		log.Printf("error: listener3 could not subscribe: %v", err)
+		logger.Error().
+			Str("listener3", "subscribtion error").
+			Msgf("error: listener3 could not subscribe: %v", err)
 	}
 	defer sub3.Drain()
 
@@ -180,10 +203,13 @@ func NatsOps() {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Fatal("operation cancelled: operation took too long")
+				logger.Fatal().
+					Str("ctx", "ctx done").
+					Msg("operation cancelled: operation took too long")
 
 			case <-done:
-				log.Println("processes succsessfully carried out")
+				logger.Info().
+					Msg("all processes done, now gracefully exiting")
 				runtime.Goexit()
 			}
 		}
@@ -204,16 +230,22 @@ func NatsOps() {
 
 	stmt, err := db.Prepare("INSERT INTO events (listener_one, listener_two, listener_three, event_time) VALUES ($1, $2, $3, $4)")
 	if err != nil {
-		log.Printf("error: could not prepare database tranasaction statement: %s", err)
+		logger.Error().
+			Str("db", "stmt preparation").
+			Msgf("error: could not prepare database tranasaction statement: %s", err)
 	}
 	defer stmt.Close()
 
 	_, err = stmt.Exec(eventResp.Listener1, eventResp.Listener2, eventResp.Listener3, eventResp.EventTime)
 	if err != nil {
-		log.Printf("error: could not insert event record into database: %s", err)
+		logger.Error().
+			Str("db", "stmt execution").
+			Msgf("error: could not event record into database: %s", err)
 	}
 
-	log.Println(eventResp)
+	logger.Info().
+		Str("response", "struct of data received + modifications").
+		Msgf("%v", eventResp)
 
 	// closed done channel indicates end of required processes
 	close(done)
