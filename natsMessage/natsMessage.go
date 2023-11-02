@@ -86,6 +86,7 @@ func NatsOps() {
 	}
 	defer logF.Close()
 
+	// logger uses Go time layout for time stamping
 	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
 
 	// sets up a logger with the created log file as the log output destination
