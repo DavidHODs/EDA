@@ -3,7 +3,7 @@ package natsMessage
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -20,12 +20,12 @@ const (
 	listenerOneSubject   = "events.chain"
 	listenerTwoSubject   = "events.chain.listener2"
 	listenerThreeSubject = "events.chain.listener3"
-	logFile              = "natsLog.log"
 )
 
 type ConnectionManager struct {
-	NC *nats.Conn
-	DB *sql.DB
+	NC      *nats.Conn
+	DB      *sql.DB
+	NatsLog *os.File
 }
 
 type EventRequest struct {
@@ -37,6 +37,34 @@ type EventResponse struct {
 	Listener2 string    `json:"listener2" db:"listener_two"`
 	Listener3 string    `json:"listener3" db:"listener_three"`
 	EventTime time.Time `json:"eventTime" db:"event_time"`
+}
+
+// NatServerConn establishes a connection with nats server
+func NatServerConn(logFile *os.File) *nats.Conn {
+	// logger uses Go time layout for time stamping
+	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
+
+	// sets up a logger with the specified log file as the log output destination
+	logger := zerolog.New(logFile).With().Timestamp().Caller().Logger()
+
+	// retrieves nats url from env file
+	envValue, err := utils.LoadEnv("NATS_URL")
+	if err != nil {
+		logger.Fatal().
+			Str("error", "utility error").
+			Msg("could not load env file")
+	}
+	url := envValue[0]
+
+	// connects to nats server using the specified url
+	nc, err := nats.Connect(url)
+	if err != nil {
+		logger.Fatal().
+			Str("nats", "connection error").
+			Msg("could not connect to nats server")
+	}
+
+	return nc
 }
 
 // forwardMessage publishes a payload modified by the respective listener
@@ -51,45 +79,18 @@ func forwardMessage(nc *nats.Conn, subject, forwardingListener string, data []by
 
 // NatsOps connects with nats server, subscribes and publishes modified payload
 func (cm *ConnectionManager) NatsOps(c *fiber.Ctx) error {
-	logF, err := utils.Logger(logFile)
-	if err != nil {
-		log.Printf("error: could not create nats ops log file: %s", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not create nats ops log file"})
-	}
-	defer logF.Close()
-
 	// logger uses Go time layout for time stamping
 	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
 
-	// sets up a logger with the created log file as the log output destination
-	logger := zerolog.New(logF).With().Timestamp().Caller().Logger()
-
-	// retrieves nats url from env file
-	// envValue, err := utils.LoadEnv("NATS_URL")
-	// if err != nil {
-	// 	logger.Error().
-	// 		Str("error", "utility error").
-	// 		Msg("could not load env file")
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not load env files"})
-	// }
-	// url := envValue[0]
-
-	// connects to nats server using the specified url
-	// nc, err := nats.Connect(url)
-	// if err != nil {
-	// 	logger.Error().
-	// 		Str("nats", "connection error").
-	// 		Msg("could not connect to nats server")
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not connect to nats server"})
-	// }
-	// defer nc.Close()
+	// sets up a logger with the specified log file as the log output destination
+	logger := zerolog.New(cm.NatsLog).With().Timestamp().Caller().Logger()
 
 	// creates listener variables to store information
 	var listenerOne, listenerTwo, listenerThree *string
 
 	// unmarshalls request body into eventReq
 	var eventReq EventRequest
-	err = c.BodyParser(&eventReq)
+	err := c.BodyParser(&eventReq)
 	if err != nil {
 		wrappedError := fmt.Errorf("invalid request: %w", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": wrappedError.Error()})

@@ -3,7 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"os"
 
 	"github.com/DavidHODs/EDA/utils"
 	"github.com/rs/zerolog"
@@ -11,24 +11,13 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// import "github.com/DavidHODs/EDA/utils"
-
-const (
-	logFile = "dbLog.log"
-)
-
-func InitDB() *sql.DB {
-	logF, err := utils.Logger(logFile)
-	if err != nil {
-		log.Fatalf("error: could not create nats ops log file: %s", err)
-	}
-	defer logF.Close()
-
+// InitDB establishes a connection with postgres database
+func InitDB(log *os.File) *sql.DB {
 	// logger uses Go time layout for time stamping
 	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
 
-	// sets up a logger with the created log file as the log output destination
-	logger := zerolog.New(logF).With().Timestamp().Caller().Logger()
+	// sets up a logger with the specified log file as the log output destination
+	logger := zerolog.New(log).With().Timestamp().Caller().Logger()
 
 	envValues, err := utils.LoadEnv("DB_USERNAME", "DB_PASSWORD", "HOST", "DATABASE")
 	if err != nil {
@@ -46,6 +35,15 @@ func InitDB() *sql.DB {
 		logger.Fatal().
 			Str("error", "pq error").
 			Msgf("could not connect to postgres: %s", err)
+		return nil
+	}
+
+	// Pings the database to verify if connection is alive.
+	err = db.Ping()
+	if err != nil {
+		logger.Fatal().
+			Str("error", "database error").
+			Msgf("ping error: %s", err)
 		return nil
 	}
 
