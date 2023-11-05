@@ -3,6 +3,7 @@ package natsMessage
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"runtime"
 	"strings"
 	"sync"
@@ -44,42 +45,8 @@ func forwardMessage(nc *nats.Conn, subject, forwardingListener string, data []by
 	return nil
 }
 
-// NatsOpsDemo connects with NATS server, subscribes, and publishes modified payload - over HTTP Request
-func NatsOpsDemo(c *fiber.Ctx) error {
-	var eventReq EventRequest
-	err := c.BodyParser(&eventReq)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
-	}
-
-	nc, err := nats.Connect(nats.DefaultURL)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-	defer nc.Close()
-
-	var listenerOneData string
-
-	// Create a subscriber to receive the message.
-	sub, err := nc.Subscribe(listenerOneSubject, func(msg *nats.Msg) {
-		listenerOneData = string(msg.Data)
-	})
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-	defer sub.Unsubscribe()
-
-	// Publish the message after subscribing.
-	err = nc.Publish(listenerOneSubject, []byte(eventReq.EventName))
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": listenerOneData})
-}
-
 // NatsOps connects with nats server, subscribes and publishes modified payload
-func NatsOps() {
+func NatsOps(c *fiber.Ctx) error {
 	logF, err := utils.Logger(logFile)
 	if err != nil {
 		log.Fatalf("error: could not create nats ops log file: %s", err)
@@ -113,6 +80,12 @@ func NatsOps() {
 	// creates listener variables to store information
 	var listenerOne, listenerTwo, listenerThree *string
 
+	var eventReq EventRequest
+	err = c.BodyParser(&eventReq)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
+	}
+
 	done := make(chan bool)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -124,6 +97,7 @@ func NatsOps() {
 
 	// creates the first listener that receives a payload from the nats cli
 	sub1, err := nc.Subscribe(listenerOneSubject, func(msg *nats.Msg) {
+		fmt.Printf("e don reach ibi &&&&&&& %s", string(msg.Data))
 		defer wg.Done()
 
 		listenerOneData := string(msg.Data)
@@ -149,6 +123,14 @@ func NatsOps() {
 			Msgf("error: listener1 could not subscribe: %v", err)
 	}
 	defer sub1.Drain()
+
+	fmt.Printf("original data &^^^^^^^^^ %s", eventReq.EventName)
+	// Publish the data to the "messages" topic.
+	err = nc.Publish(listenerOneSubject, []byte(eventReq.EventName))
+	fmt.Printf("published $$$$$$$$$$ %s", eventReq.EventName)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "could not publish message"})
+	}
 
 	// creates the second listener that receives a payload from the first listener
 	sub2, err := nc.Subscribe(listenerTwoSubject, func(msg *nats.Msg) {
@@ -259,4 +241,6 @@ func NatsOps() {
 
 	// closed done channel indicates end of required processes
 	close(done)
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{"message": "data published successfully"})
 }
