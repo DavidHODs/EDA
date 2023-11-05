@@ -1,6 +1,7 @@
 package natsMessage
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"runtime"
@@ -8,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DavidHODs/EDA/database"
 	"github.com/DavidHODs/EDA/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
@@ -22,6 +22,11 @@ const (
 	listenerThreeSubject = "events.chain.listener3"
 	logFile              = "natsLog.log"
 )
+
+type ConnectionManager struct {
+	NC *nats.Conn
+	DB *sql.DB
+}
 
 type EventRequest struct {
 	EventName string `json:"eventName"`
@@ -45,7 +50,7 @@ func forwardMessage(nc *nats.Conn, subject, forwardingListener string, data []by
 }
 
 // NatsOps connects with nats server, subscribes and publishes modified payload
-func NatsOps(c *fiber.Ctx) error {
+func (cm *ConnectionManager) NatsOps(c *fiber.Ctx) error {
 	logF, err := utils.Logger(logFile)
 	if err != nil {
 		log.Printf("error: could not create nats ops log file: %s", err)
@@ -60,24 +65,24 @@ func NatsOps(c *fiber.Ctx) error {
 	logger := zerolog.New(logF).With().Timestamp().Caller().Logger()
 
 	// retrieves nats url from env file
-	envValue, err := utils.LoadEnv("NATS_URL")
-	if err != nil {
-		logger.Error().
-			Str("error", "utility error").
-			Msg("could not load env file")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not load env files"})
-	}
-	url := envValue[0]
+	// envValue, err := utils.LoadEnv("NATS_URL")
+	// if err != nil {
+	// 	logger.Error().
+	// 		Str("error", "utility error").
+	// 		Msg("could not load env file")
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not load env files"})
+	// }
+	// url := envValue[0]
 
 	// connects to nats server using the specified url
-	nc, err := nats.Connect(url)
-	if err != nil {
-		logger.Error().
-			Str("nats", "connection error").
-			Msg("could not connect to nats server")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not connect to nats server"})
-	}
-	defer nc.Close()
+	// nc, err := nats.Connect(url)
+	// if err != nil {
+	// 	logger.Error().
+	// 		Str("nats", "connection error").
+	// 		Msg("could not connect to nats server")
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not connect to nats server"})
+	// }
+	// defer nc.Close()
 
 	// creates listener variables to store information
 	var listenerOne, listenerTwo, listenerThree *string
@@ -104,7 +109,7 @@ func NatsOps(c *fiber.Ctx) error {
 	wg.Add(3)
 
 	// creates the first listener that receives a payload from the nats cli
-	sub1, err := nc.Subscribe(listenerOneSubject, func(msg *nats.Msg) {
+	sub1, err := cm.NC.Subscribe(listenerOneSubject, func(msg *nats.Msg) {
 		defer wg.Done()
 
 		listenerOneData := string(msg.Data)
@@ -117,7 +122,7 @@ func NatsOps(c *fiber.Ctx) error {
 		capitalizedData := []byte(strings.ToUpper(listenerOneData))
 
 		// publishes modified data for second listener to pick up
-		err = forwardMessage(nc, listenerTwoSubject, "listener1", capitalizedData)
+		err = forwardMessage(cm.NC, listenerTwoSubject, "listener1", capitalizedData)
 		if err != nil {
 			logger.Error().
 				Str("publisher", "publisher two").
@@ -133,13 +138,13 @@ func NatsOps(c *fiber.Ctx) error {
 	defer sub1.Drain()
 
 	// Publishes data  from request body to listenerOneSubject.
-	err = nc.Publish(listenerOneSubject, []byte(eventReq.EventName))
+	err = cm.NC.Publish(listenerOneSubject, []byte(eventReq.EventName))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"publisher (publisher1) error": err})
 	}
 
 	// creates the second listener that receives a payload from the first listener
-	sub2, err := nc.Subscribe(listenerTwoSubject, func(msg *nats.Msg) {
+	sub2, err := cm.NC.Subscribe(listenerTwoSubject, func(msg *nats.Msg) {
 		defer wg.Done()
 
 		listenerTwoData := string(msg.Data)
@@ -152,7 +157,7 @@ func NatsOps(c *fiber.Ctx) error {
 		reversedData := []byte(utils.ReverseString(listenerTwoData))
 
 		// publishes modified data for third listener to pick up
-		err = forwardMessage(nc, listenerThreeSubject, "listener2", reversedData)
+		err = forwardMessage(cm.NC, listenerThreeSubject, "listener2", reversedData)
 		if err != nil {
 			logger.Error().
 				Str("publisher", "publisher three").
@@ -168,7 +173,7 @@ func NatsOps(c *fiber.Ctx) error {
 	defer sub2.Drain()
 
 	// creates the third listener that receives a payload from the second listener
-	sub3, err := nc.Subscribe(listenerThreeSubject, func(msg *nats.Msg) {
+	sub3, err := cm.NC.Subscribe(listenerThreeSubject, func(msg *nats.Msg) {
 		defer wg.Done()
 
 		listenerThreeData := string(msg.Data)
@@ -232,10 +237,7 @@ func NatsOps(c *fiber.Ctx) error {
 		EventTime: time.Now(),
 	}
 
-	db := database.InitDB()
-	defer db.Close()
-
-	stmt, err := db.Prepare("INSERT INTO events (listener_one, listener_two, listener_three, event_time) VALUES ($1, $2, $3, $4)")
+	stmt, err := cm.DB.Prepare("INSERT INTO events (listener_one, listener_two, listener_three, event_time) VALUES ($1, $2, $3, $4)")
 	if err != nil {
 		logger.Error().
 			Str("db", "stmt preparation").
