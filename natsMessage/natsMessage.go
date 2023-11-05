@@ -3,6 +3,7 @@ package natsMessage
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -205,10 +206,18 @@ func NatsOps(c *fiber.Ctx) error {
 				logger.Error().
 					Str("ctx", "ctx done").
 					Msg("operation cancelled: operation took too long")
+				c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"timeout error": "process took too long"})
 
 			case <-done:
 				logger.Info().
-					Msg("all pubsub process done")
+					Msg("all pubsub processes done")
+				/* runtime.Goexit() is needed to gracefully exit this routine
+				without this Goexit, when all processes gets completed, a looping file
+				already closed zerolog error gets triggered on attempt of logging ctx.Done().
+				Hence, the need to close the routine when it's done and not wait for ctx.Done()
+				case to get triggered.
+				*/
+				runtime.Goexit()
 			}
 		}
 	}()
@@ -250,5 +259,5 @@ func NatsOps(c *fiber.Ctx) error {
 	// closed done channel indicates end of required processes
 	close(done)
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "all pubsub processes done"})
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"event response": eventResp})
 }
