@@ -93,10 +93,16 @@ func (cm *ConnectionManager) NatsOps(c *fiber.Ctx) error {
 	err := c.BodyParser(&eventReq)
 	if err != nil {
 		wrappedError := fmt.Errorf("invalid request: %w", err)
+		logger.Error().
+			Str("fiber body parser", "json unmarshalling").
+			Msgf("%s", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": wrappedError.Error()})
 	}
 
 	if eventReq.EventName == "" {
+		logger.Error().
+			Str("fiber body parser", "json unmarshalling").
+			Msg("eventName is a required request body parameter")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "eventName is a required request body parameter"})
 	}
 

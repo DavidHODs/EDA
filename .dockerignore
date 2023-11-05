@@ -1,0 +1,6 @@
+.env
+dbLog.log
+natsLog.log
+EDA
+makefile
+.gitignore
