@@ -1,0 +1,45 @@
+version: "3"
+
+networks:
+  eda_network:
+
+services:
+  eda_app:
+    container_name: eda_app_container
+    # image: eda:latest
+    build:
+      context: ./  
+      dockerfile: Dockerfile 
+    ports:
+      - 8003:8080
+    restart: on-failure
+    depends_on:
+      - eda_db
+      - eda_nats
+    networks:
+      - eda_network
+    volumes:
+      - .env:/app/.env
+
+  eda_db:
+    container_name: eda_db_container
+    image: postgres:latest
+    restart: on-failure
+    environment:
+      - POSTGRES_USER= postgres
+      - POSTGRES_PASSWORD= postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - eda_network
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  eda_nats:
+    container_name: eda_nats_container
+    image: nats:latest
+    restart: on-failure
+    ports:
+      - "4223:4222"
+    networks:
+      - eda_network

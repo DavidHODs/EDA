@@ -1,0 +1,4 @@
+.env
+build/eda/dbLog.log
+build/eda/natsLog.log
+build/eda/makefile
