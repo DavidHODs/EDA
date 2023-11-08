@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/DavidHODs/EDA/utils"
@@ -13,16 +12,15 @@ import (
 )
 
 // InitDB establishes a connection with postgres database
-func InitDB(logF *os.File) *sql.DB {
+func InitDB(log *os.File) *sql.DB {
 	// logger uses Go time layout for time stamping
 	zerolog.TimeFieldFormat = zerolog.TimestampFunc().Format("2006-01-02T15:04:05Z07:00")
 
 	// sets up a logger with the specified log file as the log output destination
-	logger := zerolog.New(logF).With().Timestamp().Caller().Logger()
+	logger := zerolog.New(log).With().Timestamp().Caller().Logger()
 
 	envValues, err := utils.LoadEnv("DB_USERNAME", "DB_PASSWORD", "HOST", "DATABASE")
 	if err != nil {
-		log.Println(err)
 		logger.Fatal().
 			Str("error", "utility error").
 			Msg("could not load env file")
@@ -34,7 +32,6 @@ func InitDB(logF *os.File) *sql.DB {
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Println(err)
 		logger.Fatal().
 			Str("error", "pq error").
 			Msgf("could not connect to postgres: %s", err)
@@ -44,7 +41,6 @@ func InitDB(logF *os.File) *sql.DB {
 	// Pings the database to verify if connection is alive.
 	err = db.Ping()
 	if err != nil {
-		log.Println(err)
 		logger.Fatal().
 			Str("error", "database error").
 			Msgf("ping error: %s", err)

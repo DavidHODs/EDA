@@ -3,7 +3,6 @@ package natsMessage
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"strings"
@@ -51,7 +50,6 @@ func NatServerConn(logFile *os.File) *nats.Conn {
 	// retrieves nats url from env file
 	envValue, err := utils.LoadEnv("NATS_URL")
 	if err != nil {
-		log.Println(err)
 		logger.Fatal().
 			Str("error", "utility error").
 			Msg("could not load env file")
@@ -61,7 +59,6 @@ func NatServerConn(logFile *os.File) *nats.Conn {
 	// connects to nats server using the specified url
 	nc, err := nats.Connect(url)
 	if err != nil {
-		log.Println(err)
 		logger.Fatal().
 			Str("nats", "connection error").
 			Msg("could not connect to nats server")

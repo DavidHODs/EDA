@@ -6,10 +6,10 @@ networks:
 services:
   eda_app:
     container_name: eda_app_container
-    # image: eda:latest
-    build:
-      context: ./  
-      dockerfile: Dockerfile 
+    image: eda:latest
+    # build:
+    #   context: ./  
+    #   dockerfile: Dockerfile 
     ports:
       - 8003:8080
     restart: on-failure

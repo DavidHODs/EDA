@@ -11,5 +11,3 @@
 {"level":"info","listener":"listener three","time":"5058-1111-51T50:08:5111+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:191","message":"listener 3 modified TNEVE_YM received from listener 2 into tneve_ym"}
 {"level":"info","response":"struct of data received + modifications","time":"5058-1111-51T50:08:5111+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:260","message":"{my_event MY_EVENT tneve_ym 2023-11-05 20:03:51.102880619 +0100 WAT m=+543.231360286}"}
 {"level":"info","time":"5058-1111-51T50:08:5111+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:219","message":"all pubsub processes done"}
-{"level":"fatal","nats":"connection error","time":"6063-1111-23T03:113:08+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:67","message":"could not connect to nats server"}
-{"level":"fatal","nats":"connection error","time":"6063-1111-23T03:311:07+11:00","caller":"/home/david/Desktop/EDA/natsMessage/natsMessage.go:67","message":"could not connect to nats server"}
